@@ -1,5 +1,9 @@
 #note to self: need a switch for first yahtzee (so you can't just select it in the beginning)
 import random       #used for random number generation
+import time         #used to wait for a bit of time
+
+# global var
+filename = 'ScoreTable.txt'
 
 
 class Game:
@@ -12,6 +16,7 @@ class Game:
         self.switch = False                                 # to indicate if the score has changed
         self.bonus = 0                                      # bonus points
         self.gotbonus = False                               # indicates whether or not you got bonus already
+        self.gotyahtzee = False                             # indicates whether player has gotten a yahtzee
         for i in range(13):
             self.table.append(False)
 
@@ -23,7 +28,7 @@ class Game:
 def mainmenu():
     n = -1
     while n != 0:
-        print("Welcome. This is Yahtzee!\n"
+        print("\nWelcome. This is Yahtzee!\n"
               "Press 1 for new game\n"
               "Press 2 to see high scores\n"
               "Press 0 to exit.")
@@ -34,8 +39,97 @@ def mainmenu():
             continue        #start at the beginning
         if n == 1:
             startgame()
-        # if n == 2:
+        if n == 2:
+            viewscores(-1)
+        if n == 3:
+            artif()
     return
+
+
+def artif():
+    stat = Game()
+    stat.score = random.randrange(100) + 1
+    newhighscore(stat)
+
+
+def viewscores(recent):   # needs to be fixed
+    info, scoretable = [], []
+    print("\nHigh Scores:")
+    try:
+        f = open(filename, 'r')
+        # create a formatted array for score table
+        for x in f:
+            info.append(x)
+        f.close()
+        length = len(info)
+        pointer = 0
+        while pointer < length:
+            toadd = f"{int((pointer/2 + 1)):}: {info[pointer]:<6} {info[pointer + 1]:<20}"
+            scoretable.append(toadd)
+            pointer += 2
+        # print out high scores from scoretable
+        for x in scoretable:
+            print(x)
+    except FileNotFoundError:
+        print("No High Scores")
+
+
+def newhighscore(stat):
+    numhi = 10      # number of high scores
+    info = []
+    # read in scores
+    try:
+        f = open(filename, 'r')
+        for x in f:
+            info.append(x)
+    except FileNotFoundError:
+        f = open(filename, 'x')
+    f.close()
+    length = len(info)
+    # add high score to table here if high score
+    if length < numhi * 2:
+        name = getscorename()
+        info.append(str(stat.score) + '\n')
+        info.append(name + '\n')
+        pointer = length
+        length += 2
+    elif int(info[numhi * 2 - 2]) < stat.score:
+        name = getscorename()
+        info[numhi * 2 - 2] = (str(stat.score) + '\n')
+        info[numhi * 2 - 1] = (name + '\n')
+        pointer = length - 2
+    else:
+        return  # return cause no high score
+    # sort score table
+    loop = True
+    while pointer > 1 and loop:
+        if int(info[pointer]) > int(info[pointer - 2]):   #str.strip to get rid of \n
+            # swap high scores
+            temp = info[pointer]
+            info[pointer] = info[pointer - 2]
+            info[pointer - 2] = temp
+            # swap names
+            pointer += 1
+            temp = info[pointer]
+            info[pointer] = info[pointer - 2]
+            info[pointer - 2] = temp
+            # set pointer back to recent high score
+            pointer -= 3
+        else:
+            loop = False
+    # write high scores to file
+    f = open(filename, 'w')
+    for x in info:
+        f.write(x)
+    f.close()
+    # display score table with new high score
+    viewscores(pointer)
+
+
+def getscorename():
+    print("Congratulations!!!\nYou got a high score!")
+    name = input("Enter your name:  ")
+    return name
 
 
 def startgame():
@@ -44,6 +138,8 @@ def startgame():
     num = -1                    # number to add to score
 
     for x in range(13):
+        #print the score
+        print(f"Score: {stat.score}")
         for n in range(stat.chances):
             # roll dice
             stat.dice = roll(stat.dice, stat.holds)
@@ -64,10 +160,14 @@ def startgame():
             else:
                 print_set(stat.dice, stat.holds)
                 stat = addscore(stat, False) # False means -1 not allowed, must return score
-        # reset everything and print score
+            if stat.switch:     # break if already scored this round
+                break
+        # reset dice parameters
         stat.next()
-        print(f"Score: {stat.score}")
-
+    # display final score
+    print(f"Final Score: {stat.score}\n\n")
+    time.sleep(3)
+    newhighscore(stat)
 
 
 def get_upper(dice, value):
@@ -104,7 +204,7 @@ def straight(dice, count):
     values = [0, 0, 0, 0, 0, 0]
     start = False
     length = 1
-    conversion = {      #number of points you get for given straight length
+    conversion = {      # number of points you get for given straight length
         4 : 30,
         5 : 40
     }
@@ -135,26 +235,26 @@ def yahtzee(dice):
 
 
 def displayscore(stat):
-    #----------------
-    #render scorecard
-    #----------------
+    # ----------------
+    # render scorecard
+    # ----------------
 
     scorecard = []
     # upper section
     for i in range(6):
-        scorecard.append(get_upper(stat.dice, i + 1))        # 0-5
+        scorecard.append(get_upper(stat.dice, i + 1))       # 0-5
     # 3 and 4 of a kind
-    scorecard.append(of_a_kind(stat.dice, 3))                # 6
-    scorecard.append(of_a_kind(stat.dice, 4))                # 7
+    scorecard.append(of_a_kind(stat.dice, 3))               # 6
+    scorecard.append(of_a_kind(stat.dice, 4))               # 7
     # full house
-    scorecard.append(full_house(stat.dice))                  # 8
+    scorecard.append(full_house(stat.dice))                 # 8
     # small and large straight
-    scorecard.append(straight(stat.dice, 4))                 # 9
-    scorecard.append(straight(stat.dice, 5))                 # 10
+    scorecard.append(straight(stat.dice, 4))                # 9
+    scorecard.append(straight(stat.dice, 5))                # 10
     # YAHTZEE!
-    scorecard.append(yahtzee(stat.dice))                     # 11
+    scorecard.append(yahtzee(stat.dice))                    # 11
     # chance
-    scorecard.append(of_a_kind(stat.dice, 0))                # 12
+    scorecard.append(of_a_kind(stat.dice, 0))               # 12
 
     # remove sections already chosen
     for i, check in enumerate(stat.table):
@@ -179,19 +279,19 @@ def displayscore(stat):
 def addscore(stat, skippable):
     loop = True
     name = {
-        1 : "1's",
-        2 : "2's",
-        3 : "3's",
-        4 : "4's",
-        5 : "5's",
-        6 : "6's",
-        7 : "3 of a kind",
-        8 : "4 of a kind",
-        9 : "full house",
-        10 : "small straight",
-        11 : "large straight",
-        12 : "yahtzee",
-        13 : "chance"
+        1: "1's",
+        2: "2's",
+        3: "3's",
+        4: "4's",
+        5: "5's",
+        6: "6's",
+        7: "3 of a kind",
+        8: "4 of a kind",
+        9: "full house",
+        10: "small straight",
+        11: "large straight",
+        12: "yahtzee",
+        13: "chance"
     }
     while loop:
         scoretable = displayscore(stat)
@@ -218,25 +318,36 @@ def addscore(stat, skippable):
         stat.switch = True
         stat.table[val - 1] = True
         stat.score += scoretable[val - 1]
+        # yahtzee extra score
+        if yahtzee(stat.dice) == 50:
+            if stat.gotyahtzee:
+                stat.score += 100
+                print("Got 100 point YAHTZEE bonus!")
+            else:
+                stat.gotyahtzee = True
+
         # bonus score
         if val <= 6:
             stat.bonus += scoretable[val - 1]
             if stat.bonus >= 63 and not stat.gotbonus:
                 stat.score += 35
+                print("Got 35 point bonus score!")
                 stat.gotbonus = True
     return stat
 
 
-
-
 # prints the dice currently in set with a star alongside each die that is currently being held
 def print_set(dice, holds):
+    first = True
     output = '['
     for die, hld in zip(dice, holds):
+        if first:
+            first = False
+        else:
+            output = output + ','
         output = output + str(die)
         if hld:
             output = output + '*'
-        output = output + ','
     output += ']'
     print(output)
 
