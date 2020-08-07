@@ -390,5 +390,6 @@ def y_or_n(i):
 
 
 
+if __name__ == '__main__':
+    mainmenu()
 
-mainmenu()
